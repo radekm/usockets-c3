@@ -1,0 +1,31 @@
+on: [push]
+
+jobs:
+  build-in-bash:
+    strategy:
+      # Continue build even if some platforms fail.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    name: Build in Bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: radekm/setup-c3@v2
+        with:
+          version: v0.6.6
+      - if: runner.os == 'Windows'
+        name: Install Linux Dependencies
+        run: |
+          choco install nasm
+      - shell: bash
+        run: |
+          ./build-libs.sh
+          ./build-examples.sh
+          ls -l build

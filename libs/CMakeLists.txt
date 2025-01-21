@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD 17)
 # For macOS. Must be also set in both `manifest.json` files.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
 
+# Otherwise on Windows static libraries end up in `Debug` or `Release` subfolder.
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
+
 if(WIN32)
     # On Windows, prefer cl over gcc if both are available. By default most of
     # the CMake generators prefer gcc, even on Windows.
@@ -24,14 +28,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
-    # Note clang-cl is odd and sets both CLANG and MSVC. We base our configuration
-    # primarily on our normal Clang one.
-    set(C_CXX_FLAGS "-Werror -Wformat=2 -Wwrite-strings -Wvla -Wshadow -Wtype-limits -Wmissing-field-initializers")
     if(MSVC)
-        # clang-cl sets different default warnings than clang. It also treats -Wall
-        # as -Weverything, to match MSVC. Instead -W3 is the alias for -Wall.
-        # See http://llvm.org/viewvc/llvm-project?view=revision&revision=319116
-        set(C_CXX_FLAGS "${C_CXX_FLAGS} -W3 -Wno-unused-parameter -fmsc-version=1900")
+        set(C_CXX_FLAGS "${C_CXX_FLAGS} -fmsc-version=1900")
     else()
         if(EMSCRIPTEN)
             # emscripten's emcc/clang does not accept the "-ggdb" flag.
@@ -40,27 +38,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CLANG)
             set(C_CXX_FLAGS "${C_CXX_FLAGS} -ggdb")
         endif()
 
-        set(C_CXX_FLAGS "${C_CXX_FLAGS} -Wall -fvisibility=hidden -fno-common")
+        set(C_CXX_FLAGS "${C_CXX_FLAGS} -fvisibility=hidden -fno-common")
     endif()
-
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C_CXX_FLAGS} -Wold-style-definition")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C_CXX_FLAGS} -Wmissing-declarations -Wnon-virtual-dtor")
 elseif(MSVC)
-    set(MSVC_DISABLED_WARNINGS_LIST
-            "C4100" # 'exarg' : unreferenced formal parameter
-            "C4127" # conditional expression is constant
-            "C4244" # 'function' : conversion from 'int' to 'uint8_t',
-                    # possible loss of data
-            "C4267" # conversion from 'size_t' to 'int', possible loss of data
-            "C4706" # assignment within conditional expression
-    )
-    string(REPLACE "C" " -wd" MSVC_DISABLED_WARNINGS_STR ${MSVC_DISABLED_WARNINGS_LIST})
-    set(CMAKE_C_FLAGS   "-utf-8 -W4 -WX ${MSVC_DISABLED_WARNINGS_STR}")
+    set(CMAKE_C_FLAGS "-utf-8")
     # Without /Zc:__cplusplus, MSVC does not define the right value for
     # __cplusplus. See https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
     # If this becomes too problematic for downstream code, we can look at
     # _MSVC_LANG.
-    set(CMAKE_CXX_FLAGS "-utf-8 -W4 -WX ${MSVC_DISABLED_WARNINGS_STR} -Zc:__cplusplus")
+    set(CMAKE_CXX_FLAGS "-utf-8 -Zc:__cplusplus")
 endif()
 
 if(WIN32)
@@ -137,8 +123,18 @@ add_library(ssl STATIC ${SSL_SOURCES})
 set_property(TARGET ssl PROPERTY EXPORT_NAME SSL)
 target_link_libraries(ssl crypto)
 
+if(WIN32)
+    file(GLOB UV_SOURCES "libuv/src/*.c" "libuv/src/win/*.c")
+    add_library(uv STATIC ${UV_SOURCES})
+    target_include_directories(uv PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/libuv/include)
+    target_include_directories(uv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libuv/src)
+endif()
+
 file(GLOB_RECURSE USOCKETS_SOURCES "usockets/*.c" "usockets/*.cpp")
 add_library(usockets STATIC ${USOCKETS_SOURCES})
 target_compile_definitions(usockets PRIVATE LIBUS_USE_OPENSSL=1)
+if(WIN32)
+    target_link_libraries(usockets uv)
+endif()
 target_include_directories(usockets PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/usockets)
 target_link_libraries(usockets ssl crypto)

@@ -11,7 +11,11 @@
             "linked-libraries" : ["usockets", "ssl", "crypto", "stdc++"]
         },
         "windows-x64": {
-            "linked-libraries" : ["usockets", "ssl", "crypto"]
+            "linked-libraries" : [
+                "usockets", "uv", "ssl", "crypto",
+                "psapi", "user32", "advapi32", "iphlpapi", "userenv",
+                "ws2_32", "dbghelp", "ole32", "shell32"
+            ]
         }
     }
 }
