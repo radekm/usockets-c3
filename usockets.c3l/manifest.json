@@ -1,0 +1,17 @@
+{
+    "provides": "usockets",
+    "targets": {
+        "macos-aarch64": {
+            "cflags": "-mmacos-version-min=13.0",
+            "link-args": ["-pthread"],
+            "linked-libraries" : ["usockets", "ssl", "crypto", "c++"]
+        },
+        "linux-x64": {
+            "link-args": ["-pthread"],
+            "linked-libraries" : ["usockets", "ssl", "crypto", "stdc++"]
+        },
+        "windows-x64": {
+            "linked-libraries" : ["usockets", "ssl", "crypto"]
+        }
+    }
+}
